@@ -1,0 +1,4 @@
+"E:\clion\CLion 2025.1.2\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=E:/clion/CLion 2025.1.2/bin/ninja/win/x64/ninja.exe" -G Ninja -S E:\timeseries\github_vldb\CPU_version1 -B E:\timeseries\github_vldb\CPU_version1\cmake-build-debug-mingw
+-- Configuring done (0.3s)
+-- Generating done (0.1s)
+-- Build files have been written to: E:/timeseries/github_vldb/CPU_version1/cmake-build-debug-mingw

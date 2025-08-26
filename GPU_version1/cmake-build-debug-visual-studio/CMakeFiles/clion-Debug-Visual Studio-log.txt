@@ -1,0 +1,16 @@
+"E:\clion\CLion 2025.1.2\bin\cmake\win\x64\bin\cmake.exe" -DCMAKE_BUILD_TYPE=Debug "-DCMAKE_MAKE_PROGRAM=E:/clion/CLion 2025.1.2/bin/ninja/win/x64/ninja.exe" "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.2/bin/nvcc.exe" -G Ninja -S E:\timeseries\github_vldb\GPU_version1 -B E:\timeseries\github_vldb\GPU_version1\cmake-build-debug-visual-studio
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.2/bin/nvcc.exe"
+
+
+CMake Warning:
+  Ignoring extra path from command line:
+
+   "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.2/bin/nvcc.exe"
+
+
+-- Configuring done (0.0s)
+-- Generating done (0.1s)
+-- Build files have been written to: E:/timeseries/github_vldb/GPU_version1/cmake-build-debug-visual-studio
