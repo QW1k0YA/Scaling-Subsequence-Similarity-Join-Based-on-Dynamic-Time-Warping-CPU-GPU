@@ -7,9 +7,9 @@ set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O2")
 
-MATH(EXPR stack_size "1000*1024*1024") # 这将计算堆栈大小为100MB
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--stack,${stack_size}") # 这将设置链接器的堆栈大小选项
-# 添加链接库路径
+MATH(EXPR stack_size "1000*1024*1024")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--stack,${stack_size}")
+
 set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_executable(debug_for_promax
