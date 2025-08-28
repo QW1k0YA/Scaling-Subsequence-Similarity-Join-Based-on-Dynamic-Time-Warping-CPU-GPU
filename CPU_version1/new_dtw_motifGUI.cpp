@@ -400,12 +400,11 @@ void new_dtw_motifGUI(const vector<DOUBLE> &a, int subseqLen, int maxwarp, const
                 LB_KIM(bsf, subseqLen, special_shared_vector, my_subs, subcount - diag + 1, diag, lb_vector,
                        cnt_of_purn);
             }
+
                 cnt2 = cnt_of_purn;
                 global_prune_cnt += (cnt2 - cnt1);
                 pruning_rate = cnt_of_purn / double(subcount - diag + 1);
 
-                double cnt3 = cnt_of_purn;
-                local_prune_cnt += (cnt3 - cnt2);
                 double temp_pruning_cnt = 0;
                 int best_pruning_cnt = 0;
 
@@ -497,6 +496,8 @@ void new_dtw_motifGUI(const vector<DOUBLE> &a, int subseqLen, int maxwarp, const
                                          DUL2_local, TS2, 0, invsig, invsig_2, diag - minlag - 1);
 
                 }
+                double cnt3 = cnt_of_purn;
+                local_prune_cnt += (cnt3 - cnt2);
 
                 {
                     for (i = 1; i <= subcount - diag + 1; i++) {
@@ -567,8 +568,7 @@ void new_dtw_motifGUI(const vector<DOUBLE> &a, int subseqLen, int maxwarp, const
 
         cout << "fast prunes " << (fast_prune_cnt) / all_cnt << endl;
         cout << "global prunes " << (global_prune_cnt) / all_cnt << endl;
-        cout << "local up prunes " << cnt_up / all_cnt << endl;
-        cout << "local down prunes " << cnt_down / all_cnt << endl;
+        cout << "local prunes " << local_prune_cnt/ all_cnt << endl;
         cout << "KK prunes " << (KK_prunes_cnt) / all_cnt << endl;
         cout << "Pe prunes " << (P_prunes_cnt) / all_cnt << endl;
         cout << "DTW prunes " << (Dtw_prunes_cnt) / all_cnt << endl;
