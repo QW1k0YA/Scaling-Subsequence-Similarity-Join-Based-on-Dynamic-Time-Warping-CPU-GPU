@@ -64,7 +64,7 @@
 38596	46140	7779027628844901	CMakeFiles/GPU_dtw.dir/src/early_exit_511_with_band.cu.obj	3f7c42796dc39efd
 5658	7684	7779030397123975	CMakeFiles/GPU_dtw.dir/cmake_device_link.obj	4c0dae1e2710a8b5
 7684	7858	7779030417387258	GPU_dtw.exe	749510c56afa4b2b
-2	150	7779036548792306	build.ninja	f86f5980f23fbe28
+2	150	7779643194572199	build.ninja	f86f5980f23fbe28
 26145	47909	7779027504339142	CMakeFiles/GPU_dtw.dir/src/device_prefix_sum.cu.obj	3cb598f1f847e98
 3	22	7772045781524879	clean	28c622fcfb3a562b
 11	14615	7779027243000367	CMakeFiles/obj_kernel_DIAG.dir/lib/GLOBAL_DIAG.cu.obj	e10177ee3cfaf498

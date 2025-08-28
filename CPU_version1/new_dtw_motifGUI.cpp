@@ -479,7 +479,7 @@ void new_dtw_motifGUI(const vector<DOUBLE> &a, int subseqLen, int maxwarp, const
                                        special_shared_vector, cnt_of_purn,
                                        sumU2_sumL2_loacl, sumU_sumL_loacl, sumMASK_local, norm_U_plus_norm_L_local,
                                        raw_DIFF_UL_local, raw_DIFF_UL2_local, raw_DIFF_UL2_temp_local, DUL2_raw_local,
-                                       DUL2_local, TS2, 0, invsig, invsig_2, diag - minlag - 1);
+                                       DUL2_local, TS2, alpha, invsig, invsig_2, diag - minlag - 1);
 
                 }
 

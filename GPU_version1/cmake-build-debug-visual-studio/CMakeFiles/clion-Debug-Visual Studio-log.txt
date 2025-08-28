@@ -11,6 +11,6 @@ CMake Warning:
    "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.2/bin/nvcc.exe"
 
 
--- Configuring done (0.0s)
--- Generating done (0.1s)
+-- Configuring done (0.6s)
+-- Generating done (0.5s)
 -- Build files have been written to: E:/timeseries/github_vldb/GPU_version1/cmake-build-debug-visual-studio
