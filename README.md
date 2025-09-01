@@ -27,7 +27,7 @@ argv[4]:The ratio of band length to subsequence length
 ```
 GPU_dtw.exe "path of data" "path of time" 256 0.01
 ```
-3. If the length of subsequence and the length of the band is over 31,it is needed to change the Macro definition of `REGISTER_NUM` in the top of src/new_dtw_motifGUI_malloc.cu to the proper size, which must be over or equel to `ceil(w/31)`[w:the length of band].  
+3. If the length of subsequence and the length of the band is over 31,it is needed to change the Macro definition of `REGISTER_NUM` in the top of `src/new_dtw_motifGUI_malloc.cu` to the proper size, which must be over or equel to `ceil(w/31)`[w:the length of band].  
 for example: 
 ```
 GPU_dtw.exe "path of data" "path of time" 1024 0.05
