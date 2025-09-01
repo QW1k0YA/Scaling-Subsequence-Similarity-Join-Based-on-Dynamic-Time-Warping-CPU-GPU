@@ -51,4 +51,4 @@ This repository provides the CPU and GPU implementations of the top-1 subsequenc
    ```
    The band length is `1024 * 0.1 = 102.4`, so `ceil(102.4 / 31) = ceil(3.3) = 4`.  
    Therefore, `REGISTER_NUM` must be set to **4** in this case.
-```
+
