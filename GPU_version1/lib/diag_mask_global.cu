@@ -38,7 +38,7 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
     int row;
     int col;
     FLOAT  lb;
-    if(!lb_vector[start_pos])
+    if(!lb_vector[0])
     {
         row = start_pos;
         col = start_pos + diag - 1;
@@ -56,9 +56,9 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
         else{
             lb = 0.5*(sqrt(2*dist - DUL2[row]) - DUL[row]);
         }
-        lb_vector_new [row] = lb;
+        lb_vector_new [0] = lb;
         if(lb > bsf){
-            lb_vector[row] = true;
+            lb_vector[0] = true;
             cnt++;
         }
         else
@@ -79,17 +79,19 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
             else {
                 lb = 0.5 * (sqrt(2 * dist - DUL2[row]) - DUL[row]);
             }
-            lb_vector_new [col] = lb;
+            lb_vector_new [0] = lb;
             if(lb > bsf)
             {
-                lb_vector[col] = true;
+                lb_vector[0] = true;
                 cnt++;
             }
         }
     }
 
+    int lb_pos = 0;
     for (int low_index = start_pos + 1; low_index < end_pos; low_index++) {
         int high_index = diag + low_index - 1;
+        lb_pos++;
 
         cov_U_plus_cov_L_fir = cov_U_plus_cov_L_fir - dr_bwdU_plus_dr_bwdL[low_index ] * dc_bwd[high_index ] +
                                (dr_fwdU_plus_dr_fwdL[low_index ]) * dc_fwd[high_index];
@@ -101,7 +103,7 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
         dot_TS_M_sec = dot_TS_M_sec - dr_bwdMASK[high_index] * dc_bwd[low_index] + dr_fwdMASK[high_index] * dc_fwd[low_index];
         dot_TS2_M_sec = dot_TS2_M_sec - dr_bwdMASK[high_index] * dc_bwdTS2[low_index] + dr_fwdMASK[high_index] * dc_fwdTS2[low_index];
 
-        if(lb_vector[low_index])
+        if(lb_vector[lb_pos])
         {
             continue;
         }
@@ -121,13 +123,13 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
 
             lb = 0.5*(sqrt(2 * dist - DUL2[low_index]) - DUL[low_index]) ;
 
-            lb_vector_new [low_index] = lb;
+            lb_vector_new [lb_pos] = lb;
             if(threadIdx.x == 0)
 
             if(lb > bsf)
             {
 
-                lb_vector[low_index] = true;
+                lb_vector[lb_pos] = true;
 
                 cnt++;
                 continue;
@@ -146,11 +148,11 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
         }
         else {
             lb = 0.5 * (sqrt(2 * dist - DUL2[high_index]) - DUL[high_index]);
-            lb_vector_new [low_index] = max(lb, lb_vector_new [low_index]);
+            lb_vector_new [lb_pos] = max(lb, lb_vector_new [lb_pos]);
 
             if(lb > bsf)
             {
-                lb_vector[low_index] = true;
+                lb_vector[lb_pos] = true;
                 cnt++;
 
             }
@@ -158,13 +160,14 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
 
     }
 
+    lb_pos = -1;
     auto temp_1 = end_pos;
     for (col = start_pos; col < temp_1; col++)
     {
-
+        lb_pos++;
         row = diag + col - 1;
 
-        if(lb_vector[col])
+        if(lb_vector[lb_pos])
         {
             continue;
         }
@@ -195,9 +198,9 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
         d = min(d_right_weak,DIST(y0, q[m - 2]));
         dright+=d;
 
-        if (dleft+dright + lb_vector_new [col] * lb_vector_new [col]>=threshold2){
+        if (dleft+dright + lb_vector_new [lb_pos] * lb_vector_new [lb_pos]>=threshold2){
             cnt++;
-            lb_vector[col] = true;
+            lb_vector[lb_pos] = true;
             continue;
         }
         else{
@@ -214,8 +217,8 @@ diag_mask_global(const FLOAT *ts, int subseqlen, int diagID, bool *lb_vector, co
             d = MIN(d,DIST(q[m-2],t_[m-1]) + DIST(q[m-3],t_[m-1]));
             dright = d + dright_orgin;
 
-            if (dleft+dright  + lb_vector_new [col]* lb_vector_new [col] >=threshold2){
-                lb_vector[col] = true;
+            if (dleft+dright  + lb_vector_new [lb_pos]* lb_vector_new [lb_pos] >=threshold2){
+                lb_vector[lb_pos] = true;
                 cnt++;
                 continue;
             }

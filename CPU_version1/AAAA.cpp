@@ -27,9 +27,9 @@ int main(int argc,char* argv[])
         TS_1.push_back(TS1[i]);
     }
 
-    vector<int> L_num = {32,64,128,256,512,1024,2048};
+    vector<int> L_num = {32,64,128,256,512,1024};
 
-    vector<double> r_num = {0.1};
+    vector<double > r_num = {0.01,0.02,0.05,0.1};
 
     for (int i=0;i<r_num.size();i++) {
         for (int j=0;j<L_num.size();j++) {

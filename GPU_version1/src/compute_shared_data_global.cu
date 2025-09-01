@@ -46,10 +46,9 @@ void compute_shared_data_global(const vector<FLOAT > &ts, int subseqLen, const v
 }
 
 void compute_shared_data_global(const vector<FLOAT > &ts, int subseqLen, FLOAT* * &my_subs,
-                                int len_of_table_global, vector<vector<FLOAT >> &count_table_global)
+                                long long int len_of_table_global, vector<vector<FLOAT >> &count_table_global)
 {
     int subcount = ts.size() - subseqLen + 1;
-
     int i;
     FLOAT  value;
     int pp;

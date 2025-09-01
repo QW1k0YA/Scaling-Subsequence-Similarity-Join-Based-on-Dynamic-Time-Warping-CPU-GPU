@@ -36,7 +36,7 @@ __device__ void diag_fast_segment(const FLOAT *ts, int subseqlen, int diag_ID, c
 
     if (lb > bsf) {
         cnt++;
-        lb_vector [row] = true;
+        lb_vector [0] = true;
     }
     else
     {
@@ -47,12 +47,14 @@ __device__ void diag_fast_segment(const FLOAT *ts, int subseqlen, int diag_ID, c
         lb = 0.5*(sqrt(2*((local_del + 2*subseqlen*mu[row]*mu[row]*invsig[row])*invsig[row] + 2*subseqlen) - DUL2[row]) - DUL[row]);
 
         if (lb>bsf) {
-            lb_vector [col] = true;
+            lb_vector [0] = true;
             cnt++;
         }
     }
 
+    int lb_pos = 0;
     for (int low_index = start_pos + 1; low_index < end_pos; low_index++) {
+        lb_pos++;
 
         int high_index = diag + low_index - 1;
 
@@ -69,7 +71,7 @@ __device__ void diag_fast_segment(const FLOAT *ts, int subseqlen, int diag_ID, c
 
         if (lb> bsf) {
             cnt++;
-            lb_vector [low_index] = true;
+            lb_vector [lb_pos] = true;
             continue;
         }
 
@@ -79,7 +81,7 @@ __device__ void diag_fast_segment(const FLOAT *ts, int subseqlen, int diag_ID, c
         lb = 0.5*(sqrt(2*((local_del + 2*subseqlen*mu[high_index]*mu[high_index]*invsig[high_index])*invsig[high_index] + 2*subseqlen) - DUL2[high_index]) - DUL[high_index]);
 
         if (lb > bsf) {
-            lb_vector [low_index] = true;
+            lb_vector [lb_pos] = true;
             cnt++;
         }
 

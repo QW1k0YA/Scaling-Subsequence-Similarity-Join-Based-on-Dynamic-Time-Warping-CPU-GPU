@@ -6,8 +6,11 @@
 #define THREAD_NUM_PER_WARP 32
 
 __device__ void
-DTW_stairs_for_block(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold, int w, FLOAT *q, FLOAT *t,int bl_size) {
+DTW_stairs_for_block(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold, int w, FLOAT *q, FLOAT *t,
+                     int bl_size, FLOAT threshold_2) {
     
+    size_t vote;
+    bl_size = 2;
     int num_per_bl = bl_size*bl_size;
     int tid = threadIdx.x;
     
@@ -219,6 +222,20 @@ DTW_stairs_for_block(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT th
                     DTW_FIR[i*bl_size + j] =  d +
                             MIN(DTW_FIR[i*bl_size + j - 1],MIN(DTW_FIR[(i-1)*bl_size + j - 1],DTW_FIR[(i-1)*bl_size + j]));
 
+                    bool ifcb = (tid == 16) && (j_temp == m/2+1) && (j == 1) ;
+                    ifcb = __shfl_sync(0x1F, ifcb, 16);
+                    if(ifcb)
+                    {
+                        vote = __ballot_sync(0xFFFFFFFF, DTW_FIR[i*bl_size + j] > threshold_2);
+                        if (vote == 0xFFFFFFFF) {
+                            if(tid == 16)
+                            {
+                                Dist = INFINITY;
+                            }
+                            return;
+                        }
+                    }
+
                     i_temp++;
                 }
                 j_temp++;
@@ -272,6 +289,20 @@ DTW_stairs_for_block(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT th
                     d = (i_temp - j_temp > w ||  j_temp - i_temp> w) ? INFINITY : DIST(q[i_temp],t[j_temp]);
                     DTW_SEC[i*bl_size + j] = d + MIN(DTW_SEC[i*bl_size + j - 1],
                                                                               MIN(DTW_SEC[(i-1)*bl_size + j - 1],DTW_SEC[(i-1)*bl_size + j]));
+
+                    bool ifcb = (tid == 16) && (j_temp == m/2+1) && (j == 1) ;
+                    ifcb = __shfl_sync(0x1F, ifcb, 16);
+                    if(ifcb)
+                    {
+                        vote = __ballot_sync(0xFFFFFFFF, DTW_SEC[i*bl_size + j] > threshold_2);
+                        if (vote == 0xFFFFFFFF) {
+                            if(tid == 16)
+                            {
+                                Dist = INFINITY;
+                            }
+                            return;
+                        }
+                    }
 
                     i_temp++;
                 }
@@ -381,8 +412,7 @@ DTW_stairs_for_block(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT th
             for(int i = 1;i < bl_size;i++)
             {
                 d = (i_temp < m && j_temp < m) ?  DIST(q[i_temp],t[j_temp]) : INFINITY;
-                DTW_SEC[i] =  d +
-                              MIN(DTW_SEC[i - 1], MIN(DTW_FIR[num_per_bl - bl_size + i],DTW_FIR[num_per_bl - bl_size + i-1]));
+                DTW_SEC[i] =  d + MIN(DTW_SEC[i - 1], MIN(DTW_FIR[num_per_bl - bl_size + i],DTW_FIR[num_per_bl - bl_size + i-1]));
 
                 i_temp++;
             }
@@ -524,6 +554,221 @@ DTW_stairs(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold_2,
             {
                 DTW_SEC = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_DOWN));
             }
+
+            i_temp++;
+
+        }
+
+    }
+
+    if(!flag_pruning)
+    {
+        for(int i = 2*m  - 1- w;i < 2*m - 1;i++){
+            mask = switch_for_stair%2;
+            switch_for_stair++;
+            
+            if(!mask)
+            {
+                DTW_UP = __shfl_up_sync(0xFFFFFFFF, DTW_SEC, 1, 32);
+                
+                d = (i_temp < m && j_temp < m) ?  DIST(q[i_temp],t[j_temp]) : INFINITY;
+                DTW_FIR = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_UP));
+
+                j_temp++;
+            }
+                
+            else
+            {
+                DTW_DOWN = __shfl_down_sync(0xFFFFFFFF, DTW_FIR, 1, 32);
+                
+                d = (i_temp < m && j_temp < m) ?  DIST(q[i_temp],t[j_temp]) : INFINITY;
+                DTW_SEC = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_DOWN));
+
+                i_temp++;
+            }
+
+        }
+
+        if(tid == 16)
+        {
+            Dist = sqrt(DTW_FIR);
+
+        }
+    }
+
+}
+
+__device__ void
+DTW_stairs_test(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold_2, int w, FLOAT *q, FLOAT *t,
+                FLOAT cb1, FLOAT cb2, int *cb_prune_time, int low_index, int high_index) {
+
+    int tid = threadIdx.x%THREAD_NUM_PER_WARP;
+    
+    int warp_id = threadIdx.x/THREAD_NUM_PER_WARP;
+    
+    int num_tid = THREAD_NUM_PER_WARP;
+    
+    int shared_mem_bias = warp_id*m;
+
+    q += shared_mem_bias;
+    t += shared_mem_bias;
+    for(int i = tid;i < m;i += num_tid)
+    {   q[i] = cQuery[i];
+        t[i] = Subject[i];
+    }
+    
+    __syncwarp();
+
+    FLOAT DTW_FIR;
+    
+    if (tid == 16) {
+        DTW_FIR = 0;  
+    } else {
+        DTW_FIR = INFINITY;
+    }
+    FLOAT DTW_SEC = INFINITY;
+
+    FLOAT DTW_UP = 0;
+    FLOAT DTW_DOWN = 0;
+    
+    int row_bias = 16 - tid;
+    int col_bias = tid - 16;
+
+    int i_temp = row_bias;
+    int j_temp = col_bias;
+
+    size_t vote;
+    
+    bool flag_pruning = 0;
+
+    FLOAT d;
+    int switch_for_stair = 0;
+    bool mask;
+    for(int i = 0;i < w;i++){
+        mask = switch_for_stair%2;
+        switch_for_stair++;
+        
+        if(!mask)
+        {
+            DTW_UP = __shfl_up_sync(0xFFFFFFFF, DTW_SEC, 1, 32);
+            d = ((i_temp >= 0) && (j_temp >= 0)) ? DIST(q[i_temp],t[j_temp]) : INFINITY;
+            DTW_FIR = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_UP));
+
+            j_temp++;
+        }
+            
+        else
+        {
+            DTW_DOWN = __shfl_down_sync(0xFFFFFFFF, DTW_FIR, 1, 32);
+            
+            d = ((i_temp >= 0) && (j_temp >= 0)) ? DIST(q[i_temp],t[j_temp]) : INFINITY;
+            DTW_SEC = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_DOWN));
+
+            i_temp++;
+        }
+    }
+
+    int cb_index ;
+    FLOAT cb_temp;
+    FLOAT cb_temp1;
+    FLOAT cb_temp2;
+    for(int i = w;i < 2*m - 1 - w;i++){
+
+        mask = switch_for_stair%2;
+        switch_for_stair++;
+        
+        if(!mask)
+        {
+            DTW_UP = __shfl_up_sync(0xFFFFFFFF, DTW_SEC, 1, 32);
+            
+            d = (i_temp - j_temp > w ||  j_temp - i_temp> w) ? INFINITY  :DIST(q[i_temp],t[j_temp]);
+
+            if(i_temp - j_temp ==  w)
+            {
+                DTW_FIR = d + MIN(DTW_FIR,DTW_SEC);
+            }
+            else
+            {
+                DTW_FIR = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_UP));
+            }
+
+            cb_index = 32*(w+ j_temp)/m + 1;
+
+            bool ifcb = (tid == 16) && (cb_index == 16);
+            ifcb = __shfl_sync(0xFFFFFFFF, ifcb, 16);  
+            if(ifcb)
+            {
+                cb_temp1 = (cb_index < 32) ? __shfl_sync(0xFFFFFFFF, cb1, cb_index):0;
+                cb_temp2 = (cb_index < 32) ? __shfl_sync(0xFFFFFFFF, cb2, cb_index):0;
+                cb_temp = MAX(cb_temp1,cb_temp2);
+
+                vote = __ballot_sync(0xFFFFFFFF, DTW_FIR > threshold_2 - cb_temp);
+
+                if(low_index == 10431  && high_index ==18601)
+                {
+                    printf("DTW_FIR = %f cb_temp = %f threshold_2 - cb_temp = %f tid = %d vote = %llx \n",
+                           DTW_FIR,cb_temp,threshold_2 - cb_temp,tid,vote);
+                    if(vote == 0xFFFFFFFF)
+                    {
+                        printf("pruned in cb\n");
+                    }
+                }
+
+                if (vote == 0xFFFFFFFF) {
+                    if(tid == 16) Dist = INFINITY;
+                    flag_pruning = true;
+
+                    break;
+                }
+            }
+
+            j_temp++;
+
+        }
+            
+        else
+        {
+            DTW_DOWN = __shfl_down_sync(0xFFFFFFFF, DTW_FIR, 1, 32);
+            
+            d = (i_temp - j_temp > w ||  j_temp - i_temp> w) ? INFINITY  :DIST(q[i_temp],t[j_temp]);
+
+            if(j_temp - i_temp ==  w)
+            {
+                DTW_SEC = d + MIN(DTW_FIR,DTW_SEC);
+            }
+            else
+            {
+                DTW_SEC = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_DOWN));
+            }
+
+            cb_index = 32*(w+ j_temp)/m + 1;
+
+            bool ifcb = (tid == 16) && (cb_index == 16);
+            ifcb = __shfl_sync(0xFFFFFFFF, ifcb, 16);  
+            if(ifcb)
+            {
+                cb_temp1 = (cb_index < (32)) ? __shfl_sync(0xFFFFFFFF, cb1, cb_index):0;
+                cb_temp2 = (cb_index < (32)) ? __shfl_sync(0xFFFFFFFF, cb2, cb_index):0;
+                cb_temp = MAX(cb_temp1,cb_temp2);
+                vote = __ballot_sync(0xFFFFFFFF, DTW_SEC > threshold_2 - cb_temp);
+                if(low_index == 10431  && high_index ==18601)
+                {
+                    printf("DTW_SEC = %f cb_temp = %f threshold_2 - cb_temp = %f tid = %d vote = %llx \n",
+                           DTW_SEC,cb_temp,threshold_2 - cb_temp,tid,vote);
+                    if(vote == 0xFFFFFFFF)
+                    {
+                        printf("pruned in cb\n");
+                    }
+                }
+                if (vote == 0xFFFFFFFF) {
+                    if(tid == 16) Dist = INFINITY;
+                    flag_pruning = true;
+
+                    break;
+                }
+            }
+
+            if(tid == 16) atomicAdd(cb_prune_time,1);
 
             i_temp++;
 

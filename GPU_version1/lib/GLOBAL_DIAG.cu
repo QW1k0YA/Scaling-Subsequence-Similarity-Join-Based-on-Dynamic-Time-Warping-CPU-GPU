@@ -26,21 +26,19 @@ __device__ void atomicMinFloat(FLOAT*  address, FLOAT val) {
         } while (assumed != old);
     }
 
-__global__ void __launch_bounds__(BLOCK_SIZE,10)
-GLOBAL_DIAG(int minlag, int subcount, int subseqLen, int len, int warpmax, const FLOAT  *a, const FLOAT  *mu,
-            const FLOAT  *sig, const FLOAT  *sumU_sumL, const FLOAT  *invsig,
-            const FLOAT  *norm_U_plus_norm_L_trans, const FLOAT  *dr_bwdU_plus_dr_bwdL, const FLOAT  *dc_bwd,
-            const FLOAT  *dr_fwdU_plus_dr_fwdL, const FLOAT  *dc_fwd, const FLOAT  *UTS, const FLOAT  *LTS,
-            const FLOAT  *UTS_global, const FLOAT  *LTS_global, const FLOAT  *MASK_global, const FLOAT  *TS2,
-            bool *d_lb_vector, FLOAT *d_lb_vector_new, const FLOAT *sumMASK_global,
-            const FLOAT *sumU_sumL_global, const FLOAT *dr_bwdU_plus_dr_bwdL_global,
-            const FLOAT *dr_fwdU_plus_dr_fwdL_global, const FLOAT *dc_bwd_global, const FLOAT *dc_fwd_global,
-            const FLOAT *dr_bwdMASK_global, const FLOAT *dr_fwdMASK_global, const FLOAT *dc_bwdTS2_global,
-            const FLOAT *dc_fwdTS2_global, const FLOAT *DUL2_global, const FLOAT *DUL_global,
-            const FLOAT *norm_U_plus_norm_L_global, FLOAT **my_subs, FLOAT **subs_U, FLOAT **subs_L,
-            FLOAT **special_shared_vector, FLOAT *cb1, FLOAT *cb2, FLOAT *cb, FLOAT *d_buffers,
-            const FLOAT *d_bsf_global, const FLOAT *DUL_fast, const FLOAT *DUL2_fast, FLOAT *dtw_array,
-            int diag, int start_pos, int end_pos, FLOAT *d_buffer_prev, FLOAT *d_dtw_array_debug)
+__global__ void
+GLOBAL_DIAG(int minlag, int subcount, int subseqLen, int len, int warpmax, const FLOAT *a, const FLOAT *mu,
+            const FLOAT *sumU_sumL, const FLOAT *invsig, const FLOAT *norm_U_plus_norm_L_trans,
+            const FLOAT *dr_bwdU_plus_dr_bwdL, const FLOAT *dc_bwd, const FLOAT *dr_fwdU_plus_dr_fwdL,
+            const FLOAT *dc_fwd, const FLOAT *UTS, const FLOAT *LTS, const FLOAT *UTS_global,
+            const FLOAT *LTS_global, const FLOAT *MASK_global, const FLOAT *TS2, bool *d_lb_vector,
+            FLOAT *d_lb_vector_new, const FLOAT *sumMASK_global, const FLOAT *sumU_sumL_global,
+            const FLOAT *dr_bwdU_plus_dr_bwdL_global, const FLOAT *dr_fwdU_plus_dr_fwdL_global,
+            const FLOAT *dc_bwd_global, const FLOAT *dc_fwd_global, const FLOAT *dr_bwdMASK_global,
+            const FLOAT *dr_fwdMASK_global, const FLOAT *dc_bwdTS2_global, const FLOAT *dc_fwdTS2_global,
+            const FLOAT *DUL2_global, const FLOAT *DUL_global, const FLOAT *norm_U_plus_norm_L_global,
+            FLOAT **my_subs, FLOAT **special_shared_vector, const FLOAT *d_bsf_global, const FLOAT *DUL_fast,
+            const FLOAT *DUL2_fast, int diag, int start_pos, int end_pos)
 {
 
     int tid = threadIdx.x + blockDim.x*blockIdx.x;
@@ -51,16 +49,10 @@ GLOBAL_DIAG(int minlag, int subcount, int subseqLen, int len, int warpmax, const
         return;
     }
 
-    bool *lb_vector = &d_lb_vector[tid*subcount];
-    FLOAT *lb_vector_new = &d_lb_vector_new[tid*subcount];
-    FLOAT *buffers = &d_buffers[tid*(2*warpmax + 1)];
+    bool *lb_vector = &d_lb_vector[tid*STEP_LENGTH];
+    FLOAT *lb_vector_new = &d_lb_vector_new[tid*STEP_LENGTH];
 
     FLOAT bsf = *d_bsf_global;
-
-    for(int i = 0;i < 2*warpmax + 1;i++)
-    {
-        buffers[i] = INFINITY;
-    }
 
     __syncthreads();
 

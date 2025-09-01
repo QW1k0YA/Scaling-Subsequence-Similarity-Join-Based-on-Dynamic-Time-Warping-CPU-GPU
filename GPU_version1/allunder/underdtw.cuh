@@ -107,7 +107,7 @@ compute_shared_data_local(const vector<FLOAT > &ts, int subseqlen, FLOAT **subs,
 void compute_shared_data_global(const vector<FLOAT > &ts, int subseqLen, const vector<vector<FLOAT >> &my_subs,
                                 int len_of_table_global, vector<vector<FLOAT >> &count_table_global);
 void compute_shared_data_global(const vector<FLOAT > &ts, int subseqLen, FLOAT* * &my_subs,
-                                int len_of_table_global, vector<vector<FLOAT >> &count_table_global);
+                                long long int len_of_table_global, vector<vector<FLOAT >> &count_table_global);
 void
 diag_mask_local_down(const vector<FLOAT > &ts, int minlag, int subseqlen, FLOAT  bsf, int diagID,
                      vector<bool> &lb_vector, const vector<vector<SHORT>> &count_table,

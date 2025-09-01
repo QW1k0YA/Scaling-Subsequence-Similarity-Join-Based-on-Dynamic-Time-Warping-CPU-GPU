@@ -37,7 +37,7 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     int device;
     cudaGetDevice(&device);
     cudaDeviceProp prop;
-    cudaError_t err = cudaGetDeviceProperties(&prop, device);
+    cudaError_t errO = cudaGetDeviceProperties(&prop, device);
     int sm_count = prop.multiProcessorCount;
 
     cout << "sm = " << sm_count << endl;
@@ -69,7 +69,7 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     {
         for(int j = 0;j < subseqLen;j++)
         {
-            my_subs[i][j] = (a[i + j] - mu[i]) / sig[i];
+            my_subs[i][j] = (a[i + j] - mu[i]) * invsig[i];
         }
         lower_upper_lemire(my_subs[i],subseqLen,maxwarp,subs_L[i],subs_U[i]);
     }
@@ -81,7 +81,7 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
 
     int k = 100;
     vector<int> min_index = min_v_k(mp_ed,k);
-    
+
     FLOAT best_so_far = mp_ed[min_index[0]];
     std::vector<FLOAT> cb_temp(subseqLen + maxwarp + 1, 0);
 
@@ -103,11 +103,8 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
                 best_so_far = dtw_value;
             }
         }
-        
-    }
 
-    FLOAT  first_min = MIN(low_index, high_index);
-    FLOAT  sec_min = MAX(low_index, high_index);
+    }
 
     cout << "best so far is " << best_so_far << endl;
     cout << "the buffer_length of TS is " <<  a.size() << endl;
@@ -159,6 +156,7 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     for (int row = 0; row < subcount; row++) {
         for (int i = row; i <= row + subseqLen - 1; i++) {
             normLTS[i - row] = (LTS[i] - mu[row])*invsig[row];
+            normLTS[i - row] = (LTS[i] - mu[row])*invsig[row];
             normUTS[i - row] = (UTS[i] - mu[row])*invsig[row];
         }
 
@@ -185,23 +183,17 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
 
     for(int row = 0;row < subcount;row++){
         for(int col = 0;col < subseqLen;col++){
-            if(my_subs[row][col]> real_max) real_max = my_subs[row][col];
-            if(my_subs[row][col] < real_min) real_min = my_subs[row][col];
+            if(my_subs[row][col]> real_max && my_subs[row][col] < 100000) real_max = my_subs[row][col];
+            if(my_subs[row][col] < real_min  && my_subs[row][col] > -100000) real_min = my_subs[row][col];
         }
     }
-    
+
     FLOAT MAX_REAL_VALUE = MAX(abs(real_max), abs(real_min));
     if(MAX_REAL_VALUE > 3){
         len_of_cdf = (MAX_REAL_VALUE - 3)*20+600;
     }
     else{len_of_cdf = 600;
     }
-
-    vector<vector<SHORT>> count_table_local(len,vector<SHORT>(static_cast<int>(len_of_cdf),0));
-    compute_shared_data_local(a, subseqLen, my_subs, subs_U, subs_L, real_max,
-                                                                        real_min, pos_UU,
-                                                                        pos_LL, len_of_cdf,
-                                                                        count_table_local, MAX_REAL_VALUE); 
 
     FLOAT  cov_U_plus_cov_L;
 
@@ -213,19 +205,14 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     vector<FLOAT > proj(subseqLen);
     FLOAT lbk1,lbk2;
 
-    vector<FLOAT> cb(subseqLen + warpmax + 1,0);
-    vector<FLOAT> cb1(subseqLen + warpmax);
-    vector<FLOAT> cb2(subseqLen + warpmax);
-
-    vector<FLOAT > MP(subcount, INFINITY);
-    vector<FLOAT > MPI(subcount, INFINITY);
     vector<FLOAT > row_min_DEL(subcount, INFINITY);
 
     FLOAT  max_real_value = floor(MAX(abs(real_max), abs(real_min))) * 2 * 100;
-    int len_of_table_global = static_cast<int>(MAX(INITIAL_LEN_OF_TABLE, max_real_value)); 
+    auto len_of_table_global = static_cast<long long>(MAX(INITIAL_LEN_OF_TABLE, max_real_value));
+
     vector<vector<FLOAT >> count_table_global(subseqLen, vector<FLOAT >(len_of_table_global, 0.0));
-    
-    printf("LEN_OF_TABLE_GLOBAL is %d \n", len_of_table_global);
+
+    printf("LEN_OF_TABLE_GLOBAL is %lld \n", len_of_table_global);
     compute_shared_data_global(a, subseqLen,my_subs,len_of_table_global,count_table_global);
 
     vector<FLOAT > MASK_global(len, 0.0);
@@ -351,7 +338,6 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     FLOAT  local_down_time = 0;
 
     int index_diag = 0;
-
     int alpha_interval = MAX(subseqLen*5,1000);
     int buffer_length = MAX(subseqLen/10,30);
     int buffer_div_alpha = ceil(1.0*alpha_interval/buffer_length);
@@ -386,193 +372,154 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     FLOAT *d_cnt_up, *d_cnt_down;
 
     int *d_prefix_sum;
-    cudaMalloc(&d_prefix_sum, GRID_SIZE * sizeof(int));
+    cudaMalloc(&d_prefix_sum, GRID_SIZE * sizeof(int)); CUERR
     int *d_num_inclusive;
-    cudaMalloc(&d_num_inclusive, THREADS_NUM * sizeof(int));
+    cudaMalloc(&d_num_inclusive, THREADS_NUM * sizeof(int)); CUERR
 
     int init_d_num_of_dtw = 0;
 
-    int *h_num_of_dtw;
-    h_num_of_dtw = (int*) malloc(sizeof(int));
+    size_t *h_num_of_dtw;
+    h_num_of_dtw = (size_t*) malloc(sizeof(size_t));
     h_num_of_dtw[0] = 0;
-    int *num_keogh_prunes;
-    cudaMalloc(&num_keogh_prunes, sizeof(int));
-    cudaMemcpy(num_keogh_prunes, h_num_of_dtw, sizeof(int ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_a, a.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_a, a.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_a, a.data(), a.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_TS2, TS2.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_TS2, TS2.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_TS2, TS2.data(), TS2.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_mu, mu.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_mu, mu.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_mu, mu.data(), mu.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_sig, sig.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_sig, sig.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_sig, sig.data(), sig.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_sumU_sumL, sumU_sumL.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_sumU_sumL, sumU_sumL.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_sumU_sumL, sumU_sumL.data(), sumU_sumL.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_invsig, invsig.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_invsig, invsig.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_invsig, invsig.data(), invsig.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_norm_U_plus_norm_L_trans, norm_U_plus_norm_L_trans.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_norm_U_plus_norm_L_trans, norm_U_plus_norm_L_trans.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_norm_U_plus_norm_L_trans, norm_U_plus_norm_L_trans.data(),
                norm_U_plus_norm_L_trans.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dr_bwdU_plus_dr_bwdL, dr_bwdU_plus_dr_bwdL.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_dr_bwdU_plus_dr_bwdL, dr_bwdU_plus_dr_bwdL.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_dr_bwdU_plus_dr_bwdL, dr_bwdU_plus_dr_bwdL.data(),
                dr_bwdU_plus_dr_bwdL.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dc_bwd, dc_bwd.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_dc_bwd, dc_bwd.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_dc_bwd, dc_bwd.data(), dc_bwd.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dr_fwdU_plus_dr_fwdL, dr_fwdU_plus_dr_fwdL.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_dr_fwdU_plus_dr_fwdL, dr_fwdU_plus_dr_fwdL.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_dr_fwdU_plus_dr_fwdL, dr_fwdU_plus_dr_fwdL.data(),
                dr_fwdU_plus_dr_fwdL.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dc_fwd, dc_fwd.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_dc_fwd, dc_fwd.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_dc_fwd, dc_fwd.data(), dc_fwd.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_UTS, UTS.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_UTS, UTS.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_UTS, UTS.data(), UTS.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_LTS, LTS.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_LTS, LTS.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_LTS, LTS.data(), LTS.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_UTS_global, UTS_global.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_UTS_global, UTS_global.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_UTS_global, UTS_global.data(), UTS_global.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_LTS_global, LTS_global.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_LTS_global, LTS_global.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_LTS_global, LTS_global.data(), LTS_global.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_MASK_global, MASK_global.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_MASK_global, MASK_global.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_MASK_global, MASK_global.data(), MASK_global.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_pos_UU, pos_UU.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_pos_UU, pos_UU.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_pos_UU, pos_UU.data(), pos_UU.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_pos_LL, pos_LL.size() * sizeof(FLOAT ));
+    cudaMalloc(&d_pos_LL, pos_LL.size() * sizeof(FLOAT )); CUERR
     cudaMemcpy(d_pos_LL, pos_LL.data(), pos_LL.size() * sizeof(FLOAT ), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_sumMASK_global, sumMASK_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_sumMASK_global, sumMASK_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_sumMASK_global, sumMASK_global.data(),
                sumMASK_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_sumU_sumL_global, sumU_sumL_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_sumU_sumL_global, sumU_sumL_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_sumU_sumL_global, sumU_sumL_global.data(),
                sumU_sumL_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dr_bwdU_plus_dr_bwdL_global, dr_bwdU_plus_dr_bwdL_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dr_bwdU_plus_dr_bwdL_global, dr_bwdU_plus_dr_bwdL_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dr_bwdU_plus_dr_bwdL_global, dr_bwdU_plus_dr_bwdL_global.data(),
                dr_bwdU_plus_dr_bwdL_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dr_fwdU_plus_dr_fwdL_global, dr_fwdU_plus_dr_fwdL_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dr_fwdU_plus_dr_fwdL_global, dr_fwdU_plus_dr_fwdL_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dr_fwdU_plus_dr_fwdL_global, dr_fwdU_plus_dr_fwdL_global.data(),
                dr_fwdU_plus_dr_fwdL_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dc_bwd_global, dc_bwd_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dc_bwd_global, dc_bwd_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dc_bwd_global, dc_bwd_global.data(),
                dc_bwd_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dc_fwd_global, dc_fwd_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dc_fwd_global, dc_fwd_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dc_fwd_global, dc_fwd_global.data(),
                dc_fwd_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dr_bwdMASK_global, dr_bwdMASK_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dr_bwdMASK_global, dr_bwdMASK_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dr_bwdMASK_global, dr_bwdMASK_global.data(),
                dr_bwdMASK_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dr_fwdMASK_global, dr_fwdMASK_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dr_fwdMASK_global, dr_fwdMASK_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dr_fwdMASK_global, dr_fwdMASK_global.data(),
                dr_fwdMASK_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dc_bwdTS2_global, dc_bwdTS2_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dc_bwdTS2_global, dc_bwdTS2_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dc_bwdTS2_global, dc_bwdTS2_global.data(),
                dc_bwdTS2_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_dc_fwdTS2_global, dc_fwdTS2_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_dc_fwdTS2_global, dc_fwdTS2_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_dc_fwdTS2_global, dc_fwdTS2_global.data(),
                dc_fwdTS2_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_DUL2_global, DUL2_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_DUL2_global, DUL2_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_DUL2_global, DUL2_global.data(),
                DUL2_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_norm_U_plus_norm_L_global, norm_U_plus_norm_L_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_norm_U_plus_norm_L_global, norm_U_plus_norm_L_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_norm_U_plus_norm_L_global, norm_U_plus_norm_L_global.data(),
                norm_U_plus_norm_L_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_DUL_global, DUL_global.size() * sizeof(FLOAT));
+    cudaMalloc(&d_DUL_global, DUL_global.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_DUL_global, DUL_global.data(),
                DUL_global.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    cudaMalloc(&d_DUL_fast, DUL_fast.size() * sizeof(FLOAT));
+    cudaMalloc(&d_DUL_fast, DUL_fast.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_DUL_fast, DUL_fast.data(),
                DUL_fast.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
-    cudaMalloc(&d_DUL2_fast, DUL2_fast.size() * sizeof(FLOAT));
+    cudaMalloc(&d_DUL2_fast, DUL2_fast.size() * sizeof(FLOAT)); CUERR
     cudaMemcpy(d_DUL2_fast, DUL2_fast.data(),
                DUL2_fast.size() * sizeof(FLOAT), cudaMemcpyHostToDevice);
 
-    FLOAT *d_cb1 = nullptr, *d_cb2 = nullptr, *d_cb = nullptr;
-
     int num_threads = THREADS_NUM;
-    cudaMalloc(&d_cb1, cb1.size()* sizeof(FLOAT));
-    cudaMalloc(&d_cb2, cb2.size() * sizeof(FLOAT));
-    cudaMalloc(&d_cb, cb.size() * sizeof(FLOAT));
-
-    cudaMemcpy(d_cb1, cb1.data(),
-               cb1.size() * sizeof(FLOAT),
-               cudaMemcpyHostToDevice);
-
-    cudaMemcpy(d_cb2, cb2.data(),
-               cb2.size() * sizeof(FLOAT),
-               cudaMemcpyHostToDevice);
-
-    cudaMemcpy(d_cb, cb.data(),
-               cb.size() * sizeof(FLOAT),
-               cudaMemcpyHostToDevice);
 
     bool* d_lb_vector;
-    cudaMalloc(&d_lb_vector, num_threads * subcount * sizeof(bool));
-    bool* h_lb_vector = new bool[num_threads * subcount];
-    memset(h_lb_vector,0,sizeof(bool)*num_threads * subcount);
-    cudaMemcpy(d_lb_vector, h_lb_vector, num_threads * subcount * sizeof(bool), cudaMemcpyHostToDevice);
-
-    int* d_counter;
-    cudaMalloc(&d_counter, num_threads * sizeof(int));
-    int* h_counter = (int*)malloc(num_threads * sizeof(int));
+    cudaMalloc(&d_lb_vector, num_threads * STEP_LENGTH * sizeof(bool));
+    bool* h_lb_vector = new bool[num_threads * STEP_LENGTH];
+    memset(h_lb_vector,0,sizeof(bool)*num_threads * STEP_LENGTH);
+    cudaMemcpy(d_lb_vector, h_lb_vector, num_threads * STEP_LENGTH * sizeof(bool), cudaMemcpyHostToDevice);
 
     int* d_indices;
-    cudaMalloc(&d_indices, num_threads * subcount * sizeof(int));
+    cudaMalloc(&d_indices, num_threads * STEP_LENGTH * sizeof(int)); CUERR
     int* d_diag;
-    cudaMalloc(&d_diag, num_threads * subcount * sizeof(int));
+    cudaMalloc(&d_diag, num_threads * STEP_LENGTH * sizeof(int)); CUERR
 
-    int* h_indices = new int[num_threads * subcount];
-    memset( h_indices,0,sizeof(int)*num_threads * subcount);
-    cudaMemcpy(d_diag,  h_indices, num_threads * subcount * sizeof(int), cudaMemcpyHostToDevice);
-    int* h_indices2 = new int[num_threads * subcount];
-    memset( h_indices2,0,sizeof(int)*num_threads * subcount);
-    cudaMemcpy(d_indices,  h_indices, num_threads * subcount * sizeof(int), cudaMemcpyHostToDevice);
+    int* h_indices = new int[num_threads * STEP_LENGTH];
+    memset( h_indices,0,sizeof(int)*num_threads * STEP_LENGTH);
+    cudaMemcpy(d_diag,  h_indices, num_threads * STEP_LENGTH * sizeof(int), cudaMemcpyHostToDevice);
+    int* h_indices2 = new int[num_threads * STEP_LENGTH];
+    memset( h_indices2,0,sizeof(int)*num_threads * STEP_LENGTH);
+    cudaMemcpy(d_indices,  h_indices, num_threads * STEP_LENGTH * sizeof(int), cudaMemcpyHostToDevice);
 
     FLOAT*  d_lb_vector_new;
-    cudaMalloc(&d_lb_vector_new, num_threads * subcount * sizeof(FLOAT));
-
-    FLOAT*  d_dtw_array;
-    FLOAT*  d_dtw_array_debug;
-    FLOAT*  h_dtw_diatance = new FLOAT[num_threads * subcount];
-    std::fill(h_dtw_diatance, h_dtw_diatance + num_threads * subcount, INFINITY);
-    cudaMalloc(&d_dtw_array, num_threads * subcount * sizeof(FLOAT));
-    cudaMalloc(&d_dtw_array_debug, num_threads * subcount * sizeof(FLOAT));
-    cudaMemcpy(d_dtw_array, h_dtw_diatance, num_threads * subcount * sizeof(FLOAT), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_dtw_array_debug, h_dtw_diatance, num_threads * subcount * sizeof(FLOAT), cudaMemcpyHostToDevice);
-    delete[] h_dtw_diatance;
-
-    FLOAT*  d_buffers;
-    cudaMalloc(&d_buffers, num_threads *(2*subseqLen + 1) * sizeof(FLOAT));
-    FLOAT*  d_buffers_prev;
-    cudaMalloc(&d_buffers_prev, num_threads *(2*subseqLen + 1) * sizeof(FLOAT));
+    cudaMalloc(&d_lb_vector_new, num_threads * STEP_LENGTH * sizeof(FLOAT));
 
     cout << "best so far is " << bsf << endl;
     FLOAT* h_bsf = (FLOAT *)malloc(BSF_POOL * sizeof(FLOAT));
@@ -590,10 +537,10 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     FLOAT ** d_subs_L = nullptr;
     FLOAT ** d_shared_special_vector = nullptr;
 
-    cudaMalloc(&d_my_subs, subcount * sizeof(FLOAT *));
-    cudaMalloc(&d_subs_U, subcount * sizeof(FLOAT *));
-    cudaMalloc(&d_subs_L, subcount * sizeof(FLOAT *));
-    cudaMalloc(&d_shared_special_vector, subcount *sizeof(FLOAT *));
+    cudaMalloc(&d_my_subs, subcount * sizeof(FLOAT *)); CUERR
+    cudaMalloc(&d_subs_U, subcount * sizeof(FLOAT *)); CUERR
+    cudaMalloc(&d_subs_L, subcount * sizeof(FLOAT *)); CUERR
+    cudaMalloc(&d_shared_special_vector, subcount *sizeof(FLOAT *)); CUERR
 
     FLOAT ** tmp_my_subs = (FLOAT **)malloc(subcount * sizeof(FLOAT *));
     FLOAT ** tmp_subs_U = (FLOAT **)malloc(subcount * sizeof(FLOAT *));
@@ -602,10 +549,10 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
 
     for (int i = 0; i < subcount; ++i) {
         
-        cudaMalloc(&tmp_my_subs[i], subseqLen * sizeof(FLOAT ));
-        cudaMalloc(&tmp_subs_U[i], subseqLen * sizeof(FLOAT ));
-        cudaMalloc(&tmp_subs_L[i], subseqLen * sizeof(FLOAT ));
-        cudaMalloc(&tmp_d_shared_special_vector[i],  2 * sizeof(FLOAT ));
+        cudaMalloc(&tmp_my_subs[i], subseqLen * sizeof(FLOAT )); CUERR
+        cudaMalloc(&tmp_subs_U[i], subseqLen * sizeof(FLOAT )); CUERR
+        cudaMalloc(&tmp_subs_L[i], subseqLen * sizeof(FLOAT )); CUERR
+        cudaMalloc(&tmp_d_shared_special_vector[i],  2 * sizeof(FLOAT )); CUERR
 
         cudaMemcpy(tmp_my_subs[i], my_subs[i],
                    subseqLen * sizeof(FLOAT ), cudaMemcpyHostToDevice);
@@ -642,43 +589,11 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
 
     int step = STEP_LENGTH;
 
-    vector<FLOAT> array_cpu(THREADS_NUM*subcount,1);
-    vector<FLOAT> array_gpu(THREADS_NUM*subcount,1);
-
-    if (err != cudaSuccess) {
-        std::cerr << "Failed to get device properties: " << cudaGetErrorString(err) << std::endl;
+    if (errO != cudaSuccess) {
+        std::cerr << "Failed to get device properties: " << cudaGetErrorString(errO) << std::endl;
     }
     int numBlocks;
     int blockSize = 32*WARP_NUMS;
-
-    cudaOccupancyMaxActiveBlocksPerMultiprocessor(
-            &numBlocks,
-            process_dtw_kernel,
-            blockSize,
-            0);
-
-    {
-        err = cudaDeviceSetLimit(cudaLimitDevRuntimePendingLaunchCount, 4096 );
-        if (error != cudaSuccess) {
-            printf("fail: %s\n", cudaGetErrorString(error));
-        }
-        size_t current_limit;
-        cudaDeviceGetLimit(&current_limit, cudaLimitDevRuntimePendingLaunchCount);
-        printf("limit value: %zu\n", current_limit);
-
-    }
-
-    {
-        int activeWarps = numBlocks * blockSize / prop.warpSize;
-        int maxWarps = prop.maxThreadsPerMultiProcessor / prop.warpSize;
-        std::cout << "Occupancy: " << (FLOAT)activeWarps / maxWarps * 100 << "%" << std::endl;
-    }
-
-    cudaStream_t stream[STREAM_POOL_SIZE_KEOGH];
-    for(int i = 0; i < STREAM_POOL_SIZE_KEOGH; i++)
-    {
-        cudaStreamCreateWithFlags(&stream[i], cudaStreamNonBlocking);
-    }
 
     cudaMemcpy(&bsf, d_bsf_global, sizeof(FLOAT), cudaMemcpyDeviceToHost);
 
@@ -690,10 +605,20 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     int d_start_pos,d_end_pos;
     int t_for_cnt = ceil(1.0*subcount/step);
 
-    int dtw_cnt = 0;
+    size_t dtw_cnt = 0;
     int DTW_SHARED_MEM_SIZE = 2*subseqLen*sizeof(FLOAT)*WARP_NUMS;
 
     bool profileflag = true;
+
+    int bl_size = ceil(maxwarp/31.0);
+    if(bl_size == 2)
+    {
+        bl_size = 3;
+    }
+    else if(bl_size == 4)
+    {
+        bl_size = 5;
+    }
     for(int t_index = 0;t_index < t_for_cnt;t_index ++)
     {
         d_start_pos = t_index * step;
@@ -706,12 +631,6 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
             }
 
             FLOAT t1 = clock();
-            
-            if(profileflag)
-            {
-                cudaProfilerStart();
-                printf("profile ok \n");
-            }
 
             GLOBAL_DIAG<<<num_blocks, block_size>>>(
                     minlag,
@@ -721,7 +640,6 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
                     warpmax,
                     d_a,          
                     d_mu,
-                    d_sig,
                     d_sumU_sumL,
                     d_invsig,
                     d_norm_U_plus_norm_L_trans,
@@ -751,17 +669,9 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
                     d_DUL_global,
                     d_norm_U_plus_norm_L_global,
                     d_my_subs,
-                    d_subs_U,
-                    d_subs_L,
                     d_shared_special_vector,
-                    d_cb1,
-                    d_cb2,
-                    d_cb,
-                    d_buffers,
                     d_bsf_global, d_DUL_fast,
-                    d_DUL2_fast,
-                    d_dtw_array, diag, d_start_pos, d_end_pos, d_buffers_prev,
-                    d_dtw_array_debug);
+                    d_DUL2_fast, diag, d_start_pos, d_end_pos);
 
             cudaError_t syncErr = cudaDeviceSynchronize();
             if (syncErr != cudaSuccess) {
@@ -795,19 +705,22 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
             }
 
             FLOAT t3 = clock();
-            int bl_size;
 
             if(subseqLen < 1024)
             {
+
                 process_keogh_and_dtw_kernel_for_a_Parallelogram<<<h_num_of_dtw[0], 32, DTW_SHARED_MEM_SIZE>>>
-                (d_my_subs,  d_subs_L, d_subs_U, subseqLen, d_bsf_global, subcount,
-                 warpmax,d_indices,d_diag,h_num_of_dtw[0]);
+                        (d_my_subs, d_subs_L, d_subs_U, subseqLen, d_bsf_global, subcount,
+                         warpmax, d_indices, d_diag);
+
             }
             else
             {
-                process_keogh_and_dtw_kernel_for_a_Parallelogram_without_shared_memory<<<h_num_of_dtw[0], 32, DTW_SHARED_MEM_SIZE>>>
-                        (d_my_subs,  d_subs_L, d_subs_U, subseqLen, d_bsf_global, subcount,
-                         warpmax,d_indices,d_diag,h_num_of_dtw[0]);
+
+                process_keogh_and_dtw_kernel_for_a_Parallelogram_without_shared_memory_and_nomalized<<<h_num_of_dtw[0], 32>>>
+                        (d_my_subs, d_UTS, d_LTS, d_mu, d_invsig, subseqLen, d_bsf_global, subcount,
+                         warpmax, d_indices, d_diag, bl_size);
+
             }
             syncErr = cudaDeviceSynchronize();
             if (syncErr != cudaSuccess) {
@@ -822,28 +735,13 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
             FLOAT t4 = clock();
             t_total_dtw += (t4 - t3) ;
             t_total_diag += (t2 - t1) ;
-            if(profileflag)
-            {
-                cudaProfilerStop();
-                profileflag = false;
-            }
 
         }
-    }
-    for (int i = 0; i < STREAM_POOL_SIZE_DTW; i++) {
-        cudaStreamSynchronize(stream[i]);
-        cudaStreamDestroy(stream[i]);
     }
 
     cudaMemcpy(&bsf, d_bsf_global, sizeof(FLOAT), cudaMemcpyDeviceToHost);
 
-    int *h_num_of_keogh_prunes;
-    h_num_of_keogh_prunes = (int*) malloc(sizeof(int));
-    cudaMemcpy(h_num_of_keogh_prunes, num_keogh_prunes, sizeof(int), cudaMemcpyDeviceToHost);
-
-    printf("cb_prune  = %f\n",1.0*(*h_num_of_keogh_prunes)/(dtw_cnt));
-    printf("cb_prune  = %d\n",(*h_num_of_keogh_prunes));
-    printf("dtw cnt = %d\n",dtw_cnt);
+    printf("dtw cnt = %llu\n",dtw_cnt);
 
     FLOAT t_last = clock();
     printf("dtw time : %fs,diag time : %fs \n",t_total_dtw/CLOCKS_PER_SEC,t_total_diag/CLOCKS_PER_SEC);
@@ -892,17 +790,12 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     cudaFree(d_DUL2_fast);
     cudaFree(d_DUL_fast);
 
-    cudaFree(d_dtw_array);
-    cudaFree(d_dtw_array_debug);
     cudaFree(d_lb_vector);
     cudaFree(d_lb_vector_new);
-    cudaFree(d_buffers);
-    cudaFree(d_buffers_prev);
     cudaFree(d_indices);
     cudaFree(d_diag);
     cudaFree(d_prefix_sum);
     cudaFree(d_num_inclusive);
-    cudaFree(num_keogh_prunes);
 
     cout << endl;
 
@@ -917,7 +810,6 @@ void new_dtw_motifGUI_malloc(const vector<FLOAT> &a, int subseqLen, int maxwarp,
     free(my_subs);
     free(subs_U);
     free(subs_L);
-    free(h_num_of_keogh_prunes);
 
     delete[] h_lb_vector;
     delete[] h_indices;

@@ -2,19 +2,23 @@
 #include <cuda_runtime.h>
 #include "GPU_parameters.h"
 #include "matrix.cuh"
-#define REGISTER_NUM 4
+#define REGISTER_NUM 2
 #define THREAD_NUM_PER_WARP 32
 
 __device__ void
-DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold, int w, FLOAT *q, FLOAT *t,int bl_size) {
+DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold, int w,
+                                    int bl_size, FLOAT cb[], FLOAT threshold_2) {
     
+    bl_size = REGISTER_NUM;
+
     int num_per_bl = bl_size*bl_size;
     int tid = threadIdx.x;
     
     int num_tid = 32;
+    size_t vote;
     
-    q = cQuery;
-    t = Subject;
+    FLOAT *q =cQuery;
+    FLOAT *t = Subject;
     
     __syncthreads();
     int row_bias;
@@ -51,10 +55,14 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
     }
 
     FLOAT q0,t0,t1;
-
+    int cb_index ;
+    FLOAT cb_temp;
     int switch_for_stair = 0;
     bool mask;
     FLOAT d;
+    bool flag_pruning = false;
+
+    int target_j_temp = (m/2) - (m/2)%bl_size - 1;
 
     int w_bias = ceil((w + 1.0)/bl_size);
     for(int step = 0; step < w_bias; step++){
@@ -198,13 +206,12 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
             
             for(int i = 1;i < bl_size;i++)
             {
-
                 d = (i_temp - j_temp > w ||  j_temp - i_temp> w) ? INFINITY : DIST(q[i_temp],t[j_temp]);
                 DTW_FIR[i] = d + MIN(DTW_UP[i],MIN(DTW_UP[i-1],DTW_FIR[i-1]));
 
                 i_temp++;
             }
-            
+
             j_temp++;
             i_temp-=(bl_size);
             
@@ -228,6 +235,39 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
                     DTW_FIR[i*bl_size + j] =  d +
                             MIN(DTW_FIR[i*bl_size + j - 1],MIN(DTW_FIR[(i-1)*bl_size + j - 1],DTW_FIR[(i-1)*bl_size + j]));
 
+                    bool ifcb = (tid == 16) && (j_temp == target_j_temp) && (j == bl_size - 1) && (i == bl_size - 1) ;
+                    ifcb = __shfl_sync(0x1F, ifcb, 16);
+                    if(ifcb)
+                    {
+                        cb_index =(w + j_temp)/CB_LEN+1;
+                        cb_temp =cb[cb_index];
+                        bool all_greater = true;
+                        for (int index_of_fir = 0; index_of_fir < bl_size; ++index_of_fir) {
+                            if (DTW_FIR[index_of_fir] <= threshold_2 - cb_temp) {
+                                all_greater = false;
+                                break;
+                            }
+                        }
+
+                        for (int index_of_fir = 1; index_of_fir < bl_size; ++index_of_fir) {
+                            int left_index = index_of_fir*bl_size;
+                            if (DTW_FIR[left_index] <= threshold_2 - cb_temp) {
+                                all_greater = false;
+                                break;
+                            }
+                        }
+
+                        vote = __ballot_sync(0xFFFFFFFF, all_greater);
+                        if (vote == 0xFFFFFFFF) {
+                            if(tid == 16)
+                            {
+                                Dist = INFINITY;
+
+                            }
+                            flag_pruning = true;
+                            return;
+                        }
+                    }
                     i_temp++;
                 }
                 j_temp++;
@@ -300,6 +340,8 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
 
     __syncthreads();
 
+    if(!flag_pruning)
+    {
     for(int step = ceil(2.0*m/bl_size) - w_bias - 1; step <  ceil(2.0*m/bl_size); step++){
         mask = switch_for_stair%2;
         switch_for_stair++;
@@ -409,10 +451,6 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
 
                 DTW_SEC[i] =  d +
                               MIN(DTW_SEC[i - 1], MIN(DTW_FIR[num_per_bl - bl_size + i],DTW_FIR[num_per_bl - bl_size + i-1]));
-                if(i_temp <0 || j_temp < 0)
-                {
-                    printf("fuck in 482 i_temp = %d,j_temp = %d,tid = %d,step = %d\n",i_temp,j_temp,tid,step);
-                }
 
                 i_temp++;
             }
@@ -429,10 +467,6 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
 
                     DTW_SEC[i*bl_size + j] =  d + MIN(DTW_SEC[i*bl_size + j - 1],
                                                                               MIN(DTW_SEC[(i-1)*bl_size + j - 1],DTW_SEC[(i-1)*bl_size + j]));
-                    if( i_temp <0 || j_temp < 0)
-                    {
-                        printf("fuck in 499 i_temp = %d,j_temp = %d,tid = %d,step = %d\n",i_temp,j_temp,tid,step);
-                    }
 
                     i_temp++;
                 }
@@ -445,17 +479,18 @@ DTW_stairs_for_block_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, 
 
         }
     }
+    }
 }
 
 __device__ void
-DTW_stairs_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold_2, int w, FLOAT *q, FLOAT *t) {
+DTW_stairs_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLOAT threshold_2, int w, const FLOAT cb[]) {
 
     int tid = threadIdx.x%THREAD_NUM_PER_WARP;
     
     int num_tid = THREAD_NUM_PER_WARP;
     
-    q =cQuery;
-    t = Subject;
+    FLOAT *q =cQuery;
+    FLOAT *t = Subject;
 
     FLOAT DTW_FIR;
     
@@ -507,8 +542,6 @@ DTW_stairs_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLO
 
     int cb_index ;
     FLOAT cb_temp;
-    FLOAT cb_temp1;
-    FLOAT cb_temp2;
     for(int i = w;i < 2*m - 1 - w;i++){
 
         mask = switch_for_stair%2;
@@ -529,6 +562,24 @@ DTW_stairs_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLO
                 DTW_FIR = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_UP));
             }
 
+            bool ifcb = (tid == 16) && (j_temp == m/2) ;
+            ifcb = __shfl_sync(0x1F, ifcb, 16);
+            if(ifcb)
+            {
+                cb_index =(w + j_temp)/CB_LEN+1;
+                cb_temp =cb[cb_index];
+                vote = __ballot_sync(0xFFFFFFFF, DTW_FIR > threshold_2 - cb_temp);
+                if (vote == 0xFFFFFFFF) {
+                    if(tid == 16)
+                    {
+                        Dist = INFINITY;
+
+                    }
+                    return;
+                    flag_pruning = true;
+                }
+            }
+
             j_temp++;
 
         }
@@ -546,6 +597,25 @@ DTW_stairs_without_shared(FLOAT *Subject, FLOAT *cQuery, FLOAT &Dist, int m, FLO
             else
             {
                 DTW_SEC = d + MIN(DTW_FIR,MIN(DTW_SEC,DTW_DOWN));
+            }
+
+            bool ifcb = (tid == 16) && (j_temp == m/2);
+            ifcb = __shfl_sync(0x1F, ifcb, 16);
+            if(ifcb)
+            {
+                cb_index =(w + j_temp)/CB_LEN+1;
+                cb_temp =cb[cb_index];
+                vote = __ballot_sync(0xFFFFFFFF, DTW_SEC > threshold_2 - cb_temp);
+                if (vote == 0xFFFFFFFF) {
+                    if(tid == 16)
+                    {
+                        Dist = INFINITY;
+
+                    }
+
+                    return;
+                    flag_pruning = true;
+                }
             }
 
             i_temp++;
