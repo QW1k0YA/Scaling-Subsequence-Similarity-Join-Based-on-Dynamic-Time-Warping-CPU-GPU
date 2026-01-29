@@ -1,0 +1,6 @@
+
+#ifndef GPU_DTW_WARP_NUM_PER_BLOCK_H
+#define GPU_DTW_WARP_NUM_PER_BLOCK_H
+
+#define WARP_NUMS 1
+#endif 

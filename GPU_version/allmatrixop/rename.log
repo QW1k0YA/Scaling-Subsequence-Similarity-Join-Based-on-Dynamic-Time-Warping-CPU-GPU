@@ -1,0 +1,51 @@
+2025-03-19 15:45:24,547 - INFO - 重命名成功: addelementtofront.cpp → addelementtofront.cu
+2025-03-19 15:45:24,549 - INFO - 重命名成功: conj.cpp → conj.cu
+2025-03-19 15:45:24,550 - INFO - 重命名成功: convolve.cpp → convolve.cu
+2025-03-19 15:45:24,550 - INFO - 重命名成功: dotproduct.cpp → dotproduct.cu
+2025-03-19 15:45:24,551 - INFO - 重命名成功: doubledividedbymatrix.cpp → doubledividedbymatrix.cu
+2025-03-19 15:45:24,551 - INFO - 重命名成功: elementmultiply_complex.cpp → elementmultiply_complex.cu
+2025-03-19 15:45:24,552 - INFO - 重命名成功: elementwisemultiply_nv.cpp → elementwisemultiply_nv.cu
+2025-03-19 15:45:24,552 - INFO - 重命名成功: extractVector.cpp → extractVector.cu
+2025-03-19 15:45:24,553 - INFO - 重命名成功: extractvectorfromvector.cpp → extractvectorfromvector.cu
+2025-03-19 15:45:24,553 - INFO - 重命名成功: isempty.cpp → isempty.cu
+2025-03-19 15:45:24,554 - INFO - 重命名成功: isinfinite.cpp → isinfinite.cu
+2025-03-19 15:45:24,554 - INFO - 重命名成功: isNAN.cpp → isNAN.cu
+2025-03-19 15:45:24,555 - INFO - 重命名成功: lower_upper_lemire.cpp → lower_upper_lemire.cu
+2025-03-19 15:45:24,555 - INFO - 重命名成功: matrix_convertTo2DColOrder.cpp → matrix_convertTo2DColOrder.cu
+2025-03-19 15:45:24,556 - INFO - 重命名成功: matrix_convertTo2DRowOrder.cpp → matrix_convertTo2DRowOrder.cu
+2025-03-19 15:45:24,556 - INFO - 重命名成功: matrix_false.cpp → matrix_false.cu
+2025-03-19 15:45:24,556 - INFO - 重命名成功: matrix_transpose.cpp → matrix_transpose.cu
+2025-03-19 15:45:24,557 - INFO - 重命名成功: maxinmatrix.cpp → maxinmatrix.cu
+2025-03-19 15:45:24,557 - INFO - 重命名成功: max_v_idx.cpp → max_v_idx.cu
+2025-03-19 15:45:24,557 - INFO - 重命名成功: Mean.cpp → Mean.cu
+2025-03-19 15:45:24,558 - INFO - 重命名成功: meanwithoutNAN.cpp → meanwithoutNAN.cu
+2025-03-19 15:45:24,558 - INFO - 重命名成功: mergevector.cpp → mergevector.cu
+2025-03-19 15:45:24,558 - INFO - 重命名成功: mininmatrix.cpp → mininmatrix.cu
+2025-03-19 15:45:24,559 - INFO - 重命名成功: min_nv_includenan.cpp → min_nv_includenan.cu
+2025-03-19 15:45:24,559 - INFO - 重命名成功: min_v.cpp → min_v.cu
+2025-03-19 15:45:24,560 - INFO - 重命名成功: moving_mean.cpp → moving_mean.cu
+2025-03-19 15:45:24,560 - INFO - 重命名成功: movmax.cpp → movmax.cu
+2025-03-19 15:45:24,561 - INFO - 重命名成功: movmean.cpp → movmean.cu
+2025-03-19 15:45:24,561 - INFO - 重命名成功: movmin.cpp → movmin.cu
+2025-03-19 15:45:24,561 - INFO - 重命名成功: movstd.cpp → movstd.cu
+2025-03-19 15:45:24,561 - INFO - 重命名成功: movsum.cpp → movsum.cu
+2025-03-19 15:45:24,562 - INFO - 重命名成功: nextpow2.cpp → nextpow2.cu
+2025-03-19 15:45:24,563 - INFO - 重命名成功: nomalise.cpp → nomalise.cu
+2025-03-19 15:45:24,563 - INFO - 重命名成功: norm_vector.cpp → norm_vector.cu
+2025-03-19 15:45:24,564 - INFO - 重命名成功: or.cpp → or.cu
+2025-03-19 15:45:24,564 - INFO - 重命名成功: plus.cpp → plus.cu
+2025-03-19 15:45:24,564 - INFO - 重命名成功: plusvector.cpp → plusvector.cu
+2025-03-19 15:45:24,565 - INFO - 重命名成功: sortvec.cpp → sortvec.cu
+2025-03-19 15:45:24,565 - INFO - 重命名成功: std.cpp → std.cu
+2025-03-19 15:45:24,566 - INFO - 重命名成功: stdwithomitnan.cpp → stdwithomitnan.cu
+2025-03-19 15:45:24,566 - INFO - 重命名成功: substractvector.cpp → substractvector.cu
+2025-03-19 15:45:24,567 - INFO - 重命名成功: sum_bool_matrix.cpp → sum_bool_matrix.cu
+2025-03-19 15:45:24,567 - INFO - 重命名成功: sum_matrix.cpp → sum_matrix.cu
+2025-03-19 15:45:24,568 - INFO - 重命名成功: sum_vector.cpp → sum_vector.cu
+2025-03-19 15:45:24,568 - INFO - 重命名成功: sum_vector_bool.cpp → sum_vector_bool.cu
+2025-03-19 15:45:24,568 - INFO - 
+=== 执行报告 (2025-03-19 15:45:24) ===
+处理文件: 45
+跳过文件: 0
+错误次数: 0
+============================

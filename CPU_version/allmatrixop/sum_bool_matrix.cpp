@@ -1,0 +1,23 @@
+
+#include <iostream>
+#include <vector>
+#include "../alldef/matrix.h"
+int sum_bool_Matrix(const std::vector<std::vector<bool>>& matrix) {
+
+    if (matrix.empty() || matrix[0].empty()) {
+
+        return 0;
+    }
+
+    int sum = 0;
+
+    size_t matr_si = matrix.size();
+    size_t matr0_si = matrix[0].size();
+    for (size_t i = 0; i < matr_si; ++i) {
+        for (size_t j = 0; j < matr0_si; ++j) {
+            sum += static_cast<int>(matrix[i][j]);
+        }
+    }
+
+    return sum;
+}
