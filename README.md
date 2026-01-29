@@ -2,7 +2,9 @@
 
 ## INTRODUCTION
 This repository provides the CPU and GPU implementations of the top-1 subsequence similarity join algorithm based on Dynamic Time Warping (DTW).
-
+The algorithm is implemented in C++ and uses the CUDA programming model for GPU acceleration.
+**Necessary comments** are provided throughout the **important** part of our code to explain the logic and functionality of each section.
+The entry point for both versions is `AAAA.cpp`/'AAAA.cu'.
 ## Environment and Tools
 - **Operating System**: Windows 11  
 - **Hardware**: NVIDIA GeForce RTX 3060 Laptop GPU with 3072 CUDA cores  
